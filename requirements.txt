@@ -1,0 +1,9 @@
+# For CPU-only torch, install with:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+torch>=2.2
+torchvision>=0.17
+scikit-learn>=1.3
+numpy>=1.24
+pillow>=10.0
+matplotlib>=3.7
+streamlit>=1.35

@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+.pytest_cache/
+.DS_Store
+# Generated dataset and model artifacts
+data/synthetic/
+*.pt
+assets/_preview*.png
