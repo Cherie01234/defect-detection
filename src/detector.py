@@ -16,6 +16,7 @@ import torchvision.transforms.functional as TF
 from PIL import Image
 from sklearn.neighbors import NearestNeighbors
 
+from .coreset import greedy_coreset
 from .feature_extractor import FeatureExtractor
 
 
@@ -24,10 +25,12 @@ class AnomalyDetector:
         self,
         extractor: FeatureExtractor | None = None,
         coreset_size: int = 30000,
+        sampler: str = "random",  # "random" or "greedy" (k-center)
         seed: int = 0,
     ) -> None:
         self.extractor = extractor or FeatureExtractor()
         self.coreset_size = coreset_size
+        self.sampler = sampler
         self.seed = seed
         self.nn: NearestNeighbors | None = None
         self.grid: tuple[int, int] | None = None
@@ -43,9 +46,12 @@ class AnomalyDetector:
     def fit(self, images: list[Image.Image]) -> "AnomalyDetector":
         bank = np.concatenate([self._patches(img) for img in images], axis=0)
         if len(bank) > self.coreset_size:
-            idx = np.random.default_rng(self.seed).choice(
-                len(bank), self.coreset_size, replace=False
-            )
+            if self.sampler == "greedy":
+                idx = greedy_coreset(bank, self.coreset_size, seed=self.seed)
+            else:
+                idx = np.random.default_rng(self.seed).choice(
+                    len(bank), self.coreset_size, replace=False
+                )
             bank = bank[idx]
         self.nn = NearestNeighbors(n_neighbors=1).fit(bank)
         return self
