@@ -12,22 +12,42 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
-from torchvision.models import ResNet18_Weights, resnet18
+from torchvision.models import (
+    ResNet18_Weights,
+    ResNet50_Weights,
+    Wide_ResNet50_2_Weights,
+    resnet18,
+    resnet50,
+    wide_resnet50_2,
+)
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
+
+# All ResNet-family backbones expose .layer2 / .layer3, so the hook logic is
+# shared; only channel widths differ (richer features on the larger nets).
+BACKBONES = {
+    "resnet18": (resnet18, ResNet18_Weights.IMAGENET1K_V1),
+    "resnet50": (resnet50, ResNet50_Weights.IMAGENET1K_V2),
+    "wide_resnet50_2": (wide_resnet50_2, Wide_ResNet50_2_Weights.IMAGENET1K_V1),
+}
 
 
 class FeatureExtractor:
     def __init__(
         self,
+        backbone: str = "resnet18",
         layers: tuple[str, ...] = ("layer2", "layer3"),
         image_size: int = 224,
         device: str = "cpu",
     ) -> None:
+        if backbone not in BACKBONES:
+            raise ValueError(f"Unknown backbone {backbone!r}. Choose from {list(BACKBONES)}.")
         self.device = device
+        self.backbone = backbone
         self.layers = layers
-        self.model = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        ctor, weights = BACKBONES[backbone]
+        self.model = ctor(weights=weights)
         self.model.eval().to(device)
         for p in self.model.parameters():
             p.requires_grad_(False)

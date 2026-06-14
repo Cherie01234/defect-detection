@@ -7,5 +7,6 @@ venv/
 .DS_Store
 # Generated dataset and model artifacts
 data/synthetic/
+data/mvtec/
 *.pt
 assets/_preview*.png

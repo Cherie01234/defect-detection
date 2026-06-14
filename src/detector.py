@@ -24,11 +24,12 @@ class AnomalyDetector:
     def __init__(
         self,
         extractor: FeatureExtractor | None = None,
+        backbone: str = "resnet18",
         coreset_size: int = 30000,
         sampler: str = "random",  # "random" or "greedy" (k-center)
         seed: int = 0,
     ) -> None:
-        self.extractor = extractor or FeatureExtractor()
+        self.extractor = extractor or FeatureExtractor(backbone=backbone)
         self.coreset_size = coreset_size
         self.sampler = sampler
         self.seed = seed

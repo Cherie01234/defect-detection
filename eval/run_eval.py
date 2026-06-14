@@ -27,15 +27,15 @@ DEFAULT_ROOT = ROOT / "data" / "synthetic"
 MASK_SIZE = 256
 
 
-def evaluate(root: Path) -> dict:
+def evaluate(root: Path, backbone: str = "resnet18") -> dict:
     train_paths = dataset.list_train_good(root)
     test = dataset.list_test(root)
     if not train_paths or not test:
         raise SystemExit(f"No data under {root}. Run `python data/make_synthetic.py` first.")
 
-    print(f"Fitting on {len(train_paths)} normal images...")
+    print(f"Fitting on {len(train_paths)} normal images (backbone={backbone})...")
     t0 = time.time()
-    detector = AnomalyDetector()
+    detector = AnomalyDetector(backbone=backbone)
     detector.fit([dataset.load_image(p) for p in train_paths])
 
     img_scores, img_labels = [], []
@@ -68,5 +68,7 @@ def evaluate(root: Path) -> dict:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=str(DEFAULT_ROOT))
+    parser.add_argument("--backbone", default="resnet18",
+                        choices=["resnet18", "resnet50", "wide_resnet50_2"])
     args = parser.parse_args()
-    evaluate(Path(args.root))
+    evaluate(Path(args.root), backbone=args.backbone)
