@@ -9,6 +9,12 @@
 
 *左: 入力（傷あり） ／ 中央: 異常ヒートマップ ／ 右: 重ね合わせ。正常品の画像だけからスクラッチ位置を特定。*
 
+実データ **MVTec AD（`screw`）** でも動作します（詳細は下記「発展3」）:
+
+![MVTec screw 検出例](assets/mvtec_screw_example.png)
+
+*実画像（ネジ）での欠陥検出。左: 入力 ／ 中央: ヒートマップ ／ 右: 重ね合わせ。*
+
 ---
 
 ## 🎬 アプリのデモ
@@ -71,41 +77,15 @@ pytest                  # 軽量テスト（torch不要・CIで実行）
 RUN_HEAVY=1 pytest      # モデルを含む統合テスト（ResNet重みをDL）
 ```
 
-## 🔄 実データ（MVTec AD）への差し替え
+## 🧪 発展1: メモリバンク圧縮（k-center greedy coreset）
 
-合成データは [MVTec AD](https://www.mvtec.com/company/research/datasets/mvtec-ad) と**同じフォルダ構成**で生成しています:
+メモリバンクのサンプリングを、ランダムから**k-center greedy**（PatchCore本来の手法）に置換できるようにし（[`src/coreset.py`](src/coreset.py)）、バンクサイズと精度・推論速度のトレードオフを計測しました（[`eval/bench_coreset.py`](eval/bench_coreset.py)）。
 
-```
-<root>/train/good/*.png
-<root>/test/good/*.png        <root>/test/<defect_type>/*.png
-<root>/ground_truth/<defect_type>/<name>_mask.png
-```
+![Coresetトレードオフ](assets/coreset_tradeoff.png)
 
-そのため、MVTec ADの1カテゴリをダウンロードして指すだけで実ベンチに切替できます（取得補助は [`data/download_mvtec.py`](data/download_mvtec.py)）:
+> **知見**: 本データではバンクを **47,040 → 25パッチ（約0.05%）まで圧縮しても AUROC は劣化せず**、推論は大幅に高速化。greedyとrandomはこの易しいデータでは同等で、greedyの被覆優位は希少な正常パターンを含む難データ（MVTec等）で効くと期待される。
 
-```bash
-python data/download_mvtec.py --archive path/to/screw.tar.xz
-python eval/run_eval.py --root data/mvtec/screw --backbone wide_resnet50_2
-```
-
-## 🧪 拡張3: 実データ（MVTec `screw`）× バックボーン比較
-
-MVTec AD の中でも難しい `screw`（無地・回転が多い）で、バックボーンを変えて実測しました。
-**合成データでは精度が飽和して差が出ませんでしたが、実データでは大きいバックボーンが明確に効きます。**
-
-| Backbone | Image AUROC | Pixel AUROC | 推論(160枚) |
-|---|---|---|---|
-| ResNet18 | 0.773 | 0.979 | 36s |
-| **WideResNet50** | **0.805** | **0.982** | 108s |
-
-![MVTec screw 検出例](assets/mvtec_screw_example.png)
-
-*実画像（ネジ）での検出例。左: 入力 ／ 中央: ヒートマップ ／ 右: 重ね合わせ。傷の位置を特定。*
-
-> **知見**: 飽和した合成データだけでは「バックボーンを大きくする価値」は測れない。実データ（難カテゴリ）で初めて効果が定量化できた = **評価データの難易度設計の重要性**。
-> なお本実装は簡易版（ランダムcoreset・近傍再重み付けなし）のため、論文のSOTA（screw Image AUROC ≈0.94）には届かない。greedy coresetの大規模化や近傍再重み付けが伸びしろ。
-
-## 🧪 拡張1: 手法比較（PatchCore vs Autoencoder）
+## 🧪 発展2: 手法比較（PatchCore vs Autoencoder）
 
 特徴距離ベース（PatchCore）に加え、**正常画像で学習する畳み込みオートエンコーダ**（再構成誤差ベース）を実装し、同一データで比較しました（[`src/autoencoder.py`](src/autoencoder.py) / [`eval/compare_methods.py`](eval/compare_methods.py)）。
 
@@ -120,13 +100,25 @@ MVTec AD の中でも難しい `screw`（無地・回転が多い）で、バッ
 
 > **知見**: 「どちらが優れているか」ではなくトレードオフ。学習コストを許容できず即座に立ち上げたいならPatchCore、推論スループットや精緻な局在を重視するならAE、と用途で選べる。`python eval/compare_methods.py` で再現可能。
 
-## 🧪 拡張2: Coreset効率（k-center greedy）
+## 🧪 発展3: 実データ評価（MVTec AD `screw` × バックボーン）
 
-メモリバンクのサンプリングを、ランダムから**k-center greedy**（PatchCore本来の手法）に置換できるようにし（[`src/coreset.py`](src/coreset.py)）、バンクサイズと精度・推論速度のトレードオフを計測しました（[`eval/bench_coreset.py`](eval/bench_coreset.py)）。
+合成データは [MVTec AD](https://www.mvtec.com/company/research/datasets/mvtec-ad) と**同じフォルダ構成**なので、1カテゴリをダウンロードして指すだけで実ベンチに切替できます（取得補助は [`data/download_mvtec.py`](data/download_mvtec.py)）:
 
-![Coresetトレードオフ](assets/coreset_tradeoff.png)
+```bash
+python data/download_mvtec.py --archive path/to/screw.tar.xz
+python eval/run_eval.py --root data/mvtec/screw --backbone wide_resnet50_2
+```
 
-> **知見**: 本データではバンクを **47,040 → 25パッチ（約0.05%）まで圧縮しても AUROC は劣化せず**、推論は大幅に高速化。greedyとrandomはこの易しいデータでは同等で、greedyの被覆優位は希少な正常パターンを含む難データ（MVTec等）で効くと期待される。
+MVTec AD の中でも難しい `screw`（無地・回転が多い）で、バックボーンを変えて実測しました。
+**合成データでは精度が飽和して差が出ませんでしたが、実データでは大きいバックボーンが明確に効きます。**
+
+| Backbone | Image AUROC | Pixel AUROC | 推論(160枚) |
+|---|---|---|---|
+| ResNet18 | 0.773 | 0.979 | 36s |
+| **WideResNet50** | **0.805** | **0.982** | 108s |
+
+> **知見**: 飽和した合成データだけでは「バックボーンを大きくする価値」は測れない。実データ（難カテゴリ）で初めて効果が定量化できた = **評価データの難易度設計の重要性**。
+> なお本実装は簡易版（ランダムcoreset・近傍再重み付けなし）のため、論文のSOTA（screw Image AUROC ≈0.94）には届かない。greedy coresetの大規模化や近傍再重み付けが伸びしろ。
 
 ## 🧭 今後の拡張
 
