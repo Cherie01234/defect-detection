@@ -9,7 +9,7 @@
 | 解く課題 | 外観検査では欠陥品の画像を集めにくい。正常品の画像だけで学習し、欠陥の有無を判定して位置を示す |
 | 手法 | PatchCore方式を自前実装：ImageNet学習済みResNetの中間層（layer2＋layer3）のパッチ特徴で正常パッチのメモリバンクを作り、検査画像の各パッチと最も近い正常パッチとの距離を異常度とする（勾配学習なし・CPUで動作）。比較用にオートエンコーダ方式（再構成誤差）と k-center greedy coreset も実装 |
 | 評価方法 | 画像単位のAUROC（欠陥品と正常品の判別）とピクセル単位のAUROC（欠陥領域の特定）。実データは MVTec AD の `screw`（正常画像320枚で学習、テスト画像160枚） |
-| 結果 | MVTec AD `screw`：ResNet18 で画像 0.773／ピクセル 0.979、WideResNet50 で画像 0.805／ピクセル 0.982。合成データでは画像 1.000／ピクセル 0.993（欠陥が明瞭なため頭打ち）。簡易実装のため論文の値には届かず、伸びしろは下記「発展3」に記載 |
+| 結果 | MVTec AD `screw`：ResNet18 で画像 0.773／ピクセル 0.979、WideResNet50 で画像 0.805／ピクセル 0.982。合成データでは画像 1.000／ピクセル 0.993（欠陥が明瞭なため頭打ち）。PatchCore の論文の値（PatchCore-25%・WideResNet50 で画像 0.981）には届かず、差と伸びしろは下記「発展3」に記載 |
 | 使い方 | `python data/make_synthetic.py` → `python eval/run_eval.py`（AUROCを計測）→ `streamlit run app.py`。MVTec AD では `python eval/run_eval.py --root data/mvtec/screw --backbone wide_resnet50_2` |
 | 開発 | 設計から個人で開発（開発にはAIエージェントを活用）。pytest と GitHub Actions の CI を整備 |
 
@@ -125,13 +125,18 @@ python eval/run_eval.py --root data/mvtec/screw --backbone wide_resnet50_2
 MVTec AD の中でも難しい `screw`（無地・回転が多い）で、バックボーンを変えて実測しました。
 **合成データでは精度が飽和して差が出ませんでしたが、実データでは大きいバックボーンが明確に効きます。**
 
-| Backbone | Image AUROC | Pixel AUROC | 推論(160枚) |
+| Backbone | Image AUROC | Pixel AUROC | 学習＋推論(160枚) |
 |---|---|---|---|
 | ResNet18 | 0.773 | 0.979 | 36s |
 | **WideResNet50** | **0.805** | **0.982** | 108s |
 
 > **知見**: 飽和した合成データだけでは「バックボーンを大きくする価値」は測れない。実データ（難カテゴリ）で初めて効果が定量化できた = **評価データの難易度設計の重要性**。
-> なお本実装は簡易版（ランダムcoreset・近傍再重み付けなし）のため、論文のSOTA（screw Image AUROC ≈0.94）には届かない。greedy coresetの大規模化や近傍再重み付けが伸びしろ。
+>
+> なお、PatchCore の論文では、screw の画像AUROCは PatchCore-25%（WideResNet50）で 0.981 と報告されています（付録 Table S1）[^patchcore]。本実装は簡易版で、論文との主な違いは、パッチ特徴の局所近傍集約がないこと、メモリバンクを約12%のランダム抽出で作っていること（論文は25%を greedy coreset で選ぶ）、近傍再重み付けがないことの3点です。差の原因はまだ切り分けておらず、これらが伸びしろと考えています。
+>
+> ピクセルAUROCは、良品の画素を含めていないことと、正解マスクを入力画像と同じように中央で切り出していないことから、評価の条件が論文と異なるため、論文の値とは比べていません。
+
+[^patchcore]: K. Roth, L. Pemula, J. Zepeda, B. Schölkopf, T. Brox, P. Gehler. "Towards Total Recall in Industrial Anomaly Detection." CVPR 2022. [arXiv:2106.08265](https://arxiv.org/abs/2106.08265)
 
 ## 🧭 今後の拡張
 
