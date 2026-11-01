@@ -2,6 +2,19 @@
 
 [![CI](https://github.com/Cherie01234/defect-detection/actions/workflows/ci.yml/badge.svg)](https://github.com/Cherie01234/defect-detection/actions/workflows/ci.yml)
 
+## 概要
+
+| 項目 | 内容 |
+|---|---|
+| 解く課題 | 外観検査では欠陥品の画像を集めにくい。正常品の画像だけで学習し、欠陥の有無を判定して位置を示す |
+| 手法 | PatchCore方式を自前実装：ImageNet学習済みResNetの中間層（layer2＋layer3）のパッチ特徴で正常パッチのメモリバンクを作り、検査画像の各パッチと最も近い正常パッチとの距離を異常度とする（勾配学習なし・CPUで動作）。比較用にオートエンコーダ方式（再構成誤差）と k-center greedy coreset も実装 |
+| 評価方法 | 画像単位のAUROC（欠陥品と正常品の判別）とピクセル単位のAUROC（欠陥領域の特定）。実データは MVTec AD の `screw`（正常画像320枚で学習、テスト画像160枚） |
+| 結果 | MVTec AD `screw`：ResNet18 で画像 0.773／ピクセル 0.979、WideResNet50 で画像 0.805／ピクセル 0.982。合成データでは画像 1.000／ピクセル 0.993（欠陥が明瞭なため頭打ち）。簡易実装のため論文の値には届かず、伸びしろは下記「発展3」に記載 |
+| 使い方 | `python data/make_synthetic.py` → `python eval/run_eval.py`（AUROCを計測）→ `streamlit run app.py`。MVTec AD では `python eval/run_eval.py --root data/mvtec/screw --backbone wide_resnet50_2` |
+| 開発 | 設計から個人で開発（開発にはAIエージェントを活用）。pytest と GitHub Actions の CI を整備 |
+
+---
+
 **正常品の画像だけ**で学習し、欠陥（傷・異物・欠け）を**検出**して**位置をヒートマップで可視化**する表面検査デモです。
 学習済みCNNのパッチ特徴を使った **PatchCore方式**（勾配学習なし・CPUで動作）を自前実装し、**AUROCで精度を定量評価**しています。
 
